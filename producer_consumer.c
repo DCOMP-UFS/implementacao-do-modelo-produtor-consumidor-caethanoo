@@ -1,10 +1,11 @@
-/* * Compilar: gcc -g -Wall -o prod_cons produtor_consumidor.c -lpthread
- */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h> 
 #include <unistd.h>
 #include <time.h>
+#include "log.h"
 
 
 // CENÁRIO 1 (Fila Cheia): Produção (1s) mais rápida que Consumo (2s)
@@ -41,7 +42,7 @@ RelogioVetorial getTask(int id){
    pthread_mutex_lock(&mutex);
    
    while (taskCount == 0){
-      printf("! Fila VAZIA. C%d espera.\n", id);
+      log_espera_vazio(id);
       pthread_cond_wait(&condEmpty, &mutex);
    }
    
@@ -49,7 +50,7 @@ RelogioVetorial getTask(int id){
    for (int i = 0; i < taskCount - 1; i++) taskQueue[i] = taskQueue[i+1];
    taskCount--;
    
-   printf("   [C%d] Consumiu de P%d. Fila: %d/%d\n", id, task.id_origem, taskCount, BUFFER_SIZE);
+   log_consome(id, task.id_origem, task.relogio[0], task.relogio[1], task.relogio[2], taskCount, BUFFER_SIZE);
 
    pthread_mutex_unlock(&mutex);
    pthread_cond_signal(&condFull);
@@ -60,14 +61,13 @@ void submitTask(RelogioVetorial task, int id){
    pthread_mutex_lock(&mutex);
 
    while (taskCount == BUFFER_SIZE){
-      printf("! Fila CHEIA. P%d espera.\n", id);
+      log_espera_cheio(id);
       pthread_cond_wait(&condFull, &mutex);
    }
 
    taskQueue[taskCount++] = task;
    
-   printf("[P%d] Produziu [%d, %d, %d]. Fila: %d/%d\n", 
-          id, task.relogio[0], task.relogio[1], task.relogio[2], taskCount, BUFFER_SIZE);
+   log_produz(id, task.relogio[0], task.relogio[1], task.relogio[2], taskCount, BUFFER_SIZE);
 
    pthread_mutex_unlock(&mutex);
    pthread_cond_signal(&condEmpty);
@@ -76,8 +76,7 @@ void submitTask(RelogioVetorial task, int id){
 void *threadConsumidora(void* args) {
    long id = (long) args; 
    while (1){ 
-      RelogioVetorial rv = getTask(id);
-      printf("      -> Processado: [%d, %d, %d]\n", rv.relogio[0], rv.relogio[1], rv.relogio[2]);
+      getTask(id);
       sleep(CONS_DELAY);
    }
    return NULL;
@@ -95,6 +94,7 @@ void *threadProdutora(void* args) {
 /*--------------------------------------------------------------------*/
 int main(int argc, char* argv[]) {
    srand(time(NULL));
+   log_header(NUM_PRODUTORES, NUM_CONSUMIDORES, BUFFER_SIZE, PROD_DELAY, CONS_DELAY);
 
    pthread_mutex_init(&mutex, NULL);
    pthread_cond_init(&condEmpty, NULL);
